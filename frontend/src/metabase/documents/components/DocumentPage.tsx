@@ -507,6 +507,7 @@ export const DocumentPage = ({
               editable={canWrite && !isSaving}
               isLoading={isDocumentLoading}
               editorContainerRef={editorContainerRef}
+              contentClassName={styles.editorContent}
             />
           </Box>
         </Box>
