@@ -2,6 +2,7 @@
 import { Global } from "@emotion/react";
 import { type JSX, memo, useEffect, useId, useRef } from "react";
 
+import { initSdkTelemetryPoc } from "embedding-sdk-bundle/analytics/snowplow";
 import { ContentTranslationsProvider } from "embedding-sdk-bundle/components/private/ContentTranslationsProvider";
 import { SdkThemeProvider } from "embedding-sdk-bundle/components/private/SdkThemeProvider";
 import { useArePluginsReady } from "embedding-sdk-bundle/hooks/private/use-are-plugins-ready";
@@ -127,6 +128,12 @@ export const ComponentProviderInternal = (
   useEffect(() => {
     reduxStore.dispatch(setErrorComponent(errorComponent ?? null));
   }, [reduxStore, errorComponent]);
+
+  // PoC (EMB-1764): fire one telemetry event through the instance proxy to prove
+  // the SDK → proxy → collector chain works under a strict customer CSP.
+  useEffect(() => {
+    initSdkTelemetryPoc(authConfig.metabaseInstanceUrl);
+  }, [authConfig.metabaseInstanceUrl]);
 
   const instanceLocale = useInstanceLocale();
 

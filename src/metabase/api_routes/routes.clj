@@ -141,6 +141,7 @@
     (simple-symbol? x) api.macros/ns-handler))
 
 (defn- +auth                    [handler] (routes.common/+auth                    (->handler handler)))
+(defn- +auth-except-snowplow-proxy [handler] (routes.common/+auth-except-snowplow-proxy (->handler handler)))
 (defn- +message-only-exceptions [handler] (routes.common/+message-only-exceptions (->handler handler)))
 (defn- +public-exceptions       [handler] (routes.common/+public-exceptions       (->handler handler)))
 
@@ -160,7 +161,10 @@
    "/agent"                (metabase.agent-api.api/+agent-api-enabled metabase.agent-api.api/routes)
    "/ai-entity-analysis"   metabase.metabot.api.entity-analysis/routes
    "/alert"                (+auth metabase.pulse.api/alert-routes)
-   "/analytics"            (+auth 'metabase.analytics.api)
+   ;; NOTE: `/analytics` is `+auth` EXCEPT for `POST /analytics/snowplow-proxy`, which is intentionally PUBLIC
+   ;; (anonymous Snowplow telemetry passthrough; the SDK's browser-tracker can't carry a session cross-origin).
+   ;; See `+auth-except-snowplow-proxy` and EMB-1764 / EMB-1758.
+   "/analytics"            (+auth-except-snowplow-proxy 'metabase.analytics.api)
    "/api-key"              (+auth 'metabase.api-keys.api)
    "/automagic-dashboards" (+auth metabase.xrays.api/automagic-dashboards-routes)
    "/bookmark"             (+auth 'metabase.bookmarks.api)
