@@ -67,8 +67,6 @@
 
   svg {
     color: inherit;
-    width: 1rem !important;
-    height: 1rem !important;
 
     &:not([data-combobox-chevron]) path {
       d: path(

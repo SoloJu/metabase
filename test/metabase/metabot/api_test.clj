@@ -270,18 +270,50 @@
                                                                        :display_name "Claude Opus 4.1"}]}))]
       (is (= {:value  "anthropic/claude-haiku-4-5"
               :models [{:id "claude-haiku-4-5"
+                        :value "anthropic/claude-haiku-4-5"
                         :display_name "Claude Haiku 4.5"
+                        :original_provider "anthropic"
                         :group "Haiku"}
                        {:id "claude-opus-4-5"
+                        :value "anthropic/claude-opus-4-5"
                         :display_name "Claude Opus 4.5"
+                        :original_provider "anthropic"
                         :group "Opus"}
                        {:id "claude-opus-4-1"
+                        :value "anthropic/claude-opus-4-1"
                         :display_name "Claude Opus 4.1"
+                        :original_provider "anthropic"
                         :group "Opus"}
                        {:id "claude-sonnet-4-5"
+                        :value "anthropic/claude-sonnet-4-5"
                         :display_name "Claude Sonnet 4.5"
+                        :original_provider "anthropic"
                         :group "Sonnet"}]}
-             (mt/user-http-request :crowberto :get 200 "metabot/settings" :provider "anthropic"))))))
+             (mt/user-http-request :crowberto :get 200 "metabot/list-models" :provider "anthropic"))))))
+
+(deftest settings-model-original-provider-test
+  (doseq [[provider-and-model expected] [["metabase/anthropic/claude-sonnet-4" "anthropic"]
+                                         ["openrouter/anthropic/claude-sonnet-4" "anthropic"]
+                                         ["anthropic/claude-sonnet-4" "anthropic"]
+                                         ["metabase/openai/gpt-4.1-mini" "openai"]
+                                         ["openai/gpt-4.1-mini" "openai"]
+                                         ["openrouter/openai/gpt-4.1-mini" "openai"]
+                                         ["openrouter/google/gemini-2.5-flash" nil]
+                                         ["metabase/google/gemini-2.5-flash" nil]
+                                         ["google/gemini-2.5-flash" nil]]]
+    (let [[provider model-id] (str/split provider-and-model #"/" 2)]
+      (is (= expected (#'api/original-provider provider {:id model-id}))))))
+
+(deftest model-override-enabled-check-test
+  (testing "rejects model overrides when conversation model selection is disabled"
+    (mt/with-temporary-setting-values [metabot.settings/llm-metabot-conversation-model-selection-enabled false]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"Model selection is disabled"
+                            (#'api/check-model-override-enabled! "anthropic/claude-opus-4-1")))))
+  (testing "accepts model overrides when conversation model selection is enabled"
+    (mt/with-temporary-setting-values [metabot.settings/llm-metabot-conversation-model-selection-enabled true]
+      (is (= "anthropic/claude-opus-4-1"
+             (#'api/check-model-override-enabled! "anthropic/claude-opus-4-1"))))))
 
 (deftest settings-get-normalizes-legacy-anthropic-ids-test
   (mt/with-temporary-setting-values [llm.settings/llm-anthropic-api-key "sk-ant-valid"]
@@ -293,12 +325,16 @@
                                                                       :display_name "Claude Haiku 4.5"}]})]
       (is (= {:value  (metabot.settings/llm-metabot-provider)
               :models [{:id "claude-3-haiku-20240307"
+                        :value "anthropic/claude-3-haiku-20240307"
                         :display_name "Claude 3 Haiku"
+                        :original_provider "anthropic"
                         :group "Haiku"}
                        {:id "claude-haiku-4-5"
+                        :value "anthropic/claude-haiku-4-5"
                         :display_name "Claude Haiku 4.5"
+                        :original_provider "anthropic"
                         :group "Haiku"}]}
-             (mt/user-http-request :crowberto :get 200 "metabot/settings"
+             (mt/user-http-request :crowberto :get 200 "metabot/list-models"
                                    :provider "anthropic"))))))
 
 (deftest settings-get-groups-openrouter-models-test
@@ -311,12 +347,16 @@
                                                                       :display_name "Anthropic: Claude Sonnet 4.5"}]})]
       (is (= {:value  (metabot.settings/llm-metabot-provider)
               :models [{:id "anthropic/claude-sonnet-4.5"
+                        :value "openrouter/anthropic/claude-sonnet-4.5"
                         :display_name "Anthropic: Claude Sonnet 4.5"
+                        :original_provider "anthropic"
                         :group "Anthropic"}
                        {:id "openai/gpt-4.1-mini"
+                        :value "openrouter/openai/gpt-4.1-mini"
                         :display_name "OpenAI: GPT-4.1 mini"
+                        :original_provider "openai"
                         :group "OpenAI"}]}
-             (mt/user-http-request :crowberto :get 200 "metabot/settings"
+             (mt/user-http-request :crowberto :get 200 "metabot/list-models"
                                    :provider "openrouter"))))))
 
 (deftest settings-get-returns-metabase-models-without-api-key-test
@@ -331,10 +371,10 @@
                                                                       {:id "claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
                                                                       {:id "claude-opus-4-1" :display_name "Claude Opus 4.1"}]}))]
       (is (= {:value  "metabase/anthropic/claude-sonnet-4-6"
-              :models [{:id "anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5"}
-                       {:id "anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
-                       {:id "anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1"}]}
-             (mt/user-http-request :crowberto :get 200 "metabot/settings"
+              :models [{:id "anthropic/claude-haiku-4-5" :value "metabase/anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5" :original_provider "anthropic"}
+                       {:id "anthropic/claude-sonnet-4-6" :value "metabase/anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6" :original_provider "anthropic"}
+                       {:id "anthropic/claude-opus-4-1" :value "metabase/anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1" :original_provider "anthropic"}]}
+             (mt/user-http-request :crowberto :get 200 "metabot/list-models"
                                    :provider "metabase"))))))
 
 (deftest settings-put-updates-provider-test
@@ -352,7 +392,9 @@
                                                                        :display_name "GPT-4.1 mini"}]}))]
       (is (= {:value  "openai/gpt-4.1-mini"
               :models [{:id "gpt-4.1-mini"
-                        :display_name "GPT-4.1 mini"}]}
+                        :value "openai/gpt-4.1-mini"
+                        :display_name "GPT-4.1 mini"
+                        :original_provider "openai"}]}
              (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                    {:provider "openai"
                                     :model    "gpt-4.1-mini"})))
@@ -371,9 +413,9 @@
                                                                       {:id "claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
                                                                       {:id "claude-opus-4-1" :display_name "Claude Opus 4.1"}]}))]
       (is (= {:value  "metabase/anthropic/claude-sonnet-4-6"
-              :models [{:id "anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5"}
-                       {:id "anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
-                       {:id "anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1"}]}
+              :models [{:id "anthropic/claude-haiku-4-5" :value "metabase/anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5" :original_provider "anthropic"}
+                       {:id "anthropic/claude-sonnet-4-6" :value "metabase/anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6" :original_provider "anthropic"}
+                       {:id "anthropic/claude-opus-4-1" :value "metabase/anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1" :original_provider "anthropic"}]}
              (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                    {:provider "metabase"
                                     :model    "anthropic/claude-sonnet-4-6"})))
@@ -392,9 +434,9 @@
                                                                       {:id "claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
                                                                       {:id "claude-opus-4-1" :display_name "Claude Opus 4.1"}]}))]
       (is (= {:value  "metabase/anthropic/claude-sonnet-4-6"
-              :models [{:id "anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5"}
-                       {:id "anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6"}
-                       {:id "anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1"}]}
+              :models [{:id "anthropic/claude-haiku-4-5" :value "metabase/anthropic/claude-haiku-4-5" :display_name "Claude Haiku 4.5" :original_provider "anthropic"}
+                       {:id "anthropic/claude-sonnet-4-6" :value "metabase/anthropic/claude-sonnet-4-6" :display_name "Claude Sonnet 4.6" :original_provider "anthropic"}
+                       {:id "anthropic/claude-opus-4-1" :value "metabase/anthropic/claude-opus-4-1" :display_name "Claude Opus 4.1" :original_provider "anthropic"}]}
              (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                    {:provider "metabase"
                                     :model    ""})))
@@ -413,9 +455,11 @@
                                                                    "verification should happen before saving the key")
                                                                {:models [{:id "claude-haiku-4-5"
                                                                           :display_name "Claude Haiku 4.5"}]})]
-          (is (= {:value  (metabot.settings/llm-metabot-provider)
+          (is (= {:value  "anthropic/claude-sonnet-4-6"
                   :models [{:id "claude-haiku-4-5"
+                            :value "anthropic/claude-haiku-4-5"
                             :display_name "Claude Haiku 4.5"
+                            :original_provider "anthropic"
                             :group "Haiku"}]}
                  (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                        {:provider "anthropic"
@@ -441,7 +485,9 @@
                                                                           :group "Opus"}]})]
           (is (= {:value  "anthropic/claude-opus-4-1"
                   :models [{:id "claude-opus-4-1"
+                            :value "anthropic/claude-opus-4-1"
                             :display_name "Claude Opus 4.1"
+                            :original_provider "anthropic"
                             :group "Opus"}]}
                  (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                        {:provider "anthropic"
@@ -473,10 +519,14 @@
                                                                           :group "Opus"}]})]
           (is (= {:value  "anthropic/claude-sonnet-4-6"
                   :models [{:id "claude-opus-4-1"
+                            :value "anthropic/claude-opus-4-1"
                             :display_name "Claude Opus 4.1"
+                            :original_provider "anthropic"
                             :group "Opus"}
                            {:id "claude-sonnet-4-6"
+                            :value "anthropic/claude-sonnet-4-6"
                             :display_name "Claude Sonnet 4.6"
+                            :original_provider "anthropic"
                             :group "Sonnet"}]}
                  (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                        {:provider "anthropic"
@@ -501,10 +551,14 @@
                                                                       :display_name "Claude Opus 4.1"}]})]
       (is (= {:value  "anthropic/claude-opus-4-1"
               :models [{:id "claude-opus-4-1"
+                        :value "anthropic/claude-opus-4-1"
                         :display_name "Claude Opus 4.1"
+                        :original_provider "anthropic"
                         :group "Opus"}
                        {:id "claude-sonnet-4-6"
+                        :value "anthropic/claude-sonnet-4-6"
                         :display_name "Claude Sonnet 4.6"
+                        :original_provider "anthropic"
                         :group "Sonnet"}]}
              (mt/user-http-request :crowberto :put 200 "metabot/settings"
                                    {:provider "anthropic"
@@ -572,14 +626,30 @@
       (is (= {:value         (metabot.settings/llm-metabot-provider)
               :api-key-error "OpenAI API key expired or invalid"
               :models        []}
-             (mt/user-http-request :crowberto :get 200 "metabot/settings"
+             (mt/user-http-request :crowberto :get 200 "metabot/list-models"
                                    :provider "openai"))))))
 
 (deftest settings-permissions-test
-  (mt/user-http-request :rasta :get 403 "metabot/settings" :provider "anthropic")
   (mt/user-http-request :rasta :put 403 "metabot/settings"
                         {:provider "anthropic"
                          :model    "claude-haiku-4-5"}))
+
+(deftest list-models-does-not-require-setting-permission-test
+  (mt/with-temporary-setting-values [metabot-enabled? false
+                                     metabot.settings/llm-metabot-provider "anthropic/claude-haiku-4-5"
+                                     llm.settings/llm-anthropic-api-key    "sk-ant-valid"]
+    (mt/with-dynamic-fn-redefs [metabot.self/list-models (fn [provider {:keys [api-key]}]
+                                                           (is (= "anthropic" provider))
+                                                           (is (= "sk-ant-valid" api-key))
+                                                           {:models [{:id "claude-haiku-4-5"
+                                                                      :display_name "Claude Haiku 4.5"}]})]
+      (is (= {:value  "anthropic/claude-haiku-4-5"
+              :models [{:id "claude-haiku-4-5"
+                        :value "anthropic/claude-haiku-4-5"
+                        :display_name "Claude Haiku 4.5"
+                        :original_provider "anthropic"
+                        :group "Haiku"}]}
+             (mt/user-http-request :rasta :get 200 "metabot/list-models" :provider "anthropic"))))))
 
 (deftest metabot-provider-without-api-key-is-configured-test
   (mt/with-premium-features #{:metabase-ai-managed}

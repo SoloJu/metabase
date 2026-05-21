@@ -11,6 +11,7 @@ import { useGetSuggestedMetabotPromptsQuery } from "metabase/api";
 import { MetabotLogo } from "metabase/common/components/MetabotLogo";
 import { useSetting } from "metabase/common/hooks";
 import { AIProviderConfigurationModal } from "metabase/metabot/components/AIProviderConfigurationModal";
+import { MetabotModelSelector } from "metabase/metabot/components/MetabotModelSelector";
 import { MetabotPromptInput } from "metabase/metabot/components/MetabotPromptInput";
 import { QueryBuilder } from "metabase/query_builder/containers/QueryBuilder";
 import { useDispatch, useSelector } from "metabase/redux";
@@ -80,6 +81,8 @@ const MetabotQueryBuilderInner = () => {
     promptInputRef,
     submitInput,
     cancelRequest,
+    modelOverride,
+    setModelOverride,
   } = useMetabotAgent();
 
   const [title] = useState(getTitleText);
@@ -95,8 +98,13 @@ const MetabotQueryBuilderInner = () => {
   const suggestedPromptCount = suggestedPrompts?.length ?? 0;
 
   const handleSubmitPrompt = async (prompt: string) => {
+    const selectedModelOverride = modelOverride;
+
     // start new nlq convo
     resetConversation();
+    if (selectedModelOverride) {
+      setModelOverride(selectedModelOverride);
+    }
     setHasError(false);
 
     // work around to show prompt during loading state - this is due to
@@ -222,25 +230,34 @@ const MetabotQueryBuilderInner = () => {
               )}
             </Box>
             <Box className={S.inputActions}>
-              {hasError ? (
-                <Text c="error" ta="center">
-                  {t`Something went wrong. Please try again.`}
-                </Text>
-              ) : (
-                <div />
-              )}
-              <ActionIcon
-                className={S.sendButton}
-                variant="filled"
-                size="2rem"
-                disabled={!canUseNlq || inputDisabled}
-                loading={isDoingScience}
-                onClick={handleEditorSubmit}
-                data-testid="metabot-send-message"
-                aria-label={t`Send`}
-              >
-                <Icon name="arrow_up" />
-              </ActionIcon>
+              <Box className={S.inputActionsLeft}>
+                {hasError && (
+                  <Text c="error" ta="center">
+                    {t`Something went wrong. Please try again.`}
+                  </Text>
+                )}
+              </Box>
+              <Box className={S.inputActionsRight}>
+                {canUseNlq && (
+                  <MetabotModelSelector
+                    disabled={isDoingScience}
+                    modelOverride={modelOverride}
+                    onModelOverrideChange={setModelOverride}
+                  />
+                )}
+                <ActionIcon
+                  className={S.sendButton}
+                  variant="filled"
+                  size="2rem"
+                  disabled={!canUseNlq || inputDisabled}
+                  loading={isDoingScience}
+                  onClick={handleEditorSubmit}
+                  data-testid="metabot-send-message"
+                  aria-label={t`Send`}
+                >
+                  <Icon name="arrow_up" />
+                </ActionIcon>
+              </Box>
             </Box>
           </Paper>
 

@@ -1,9 +1,13 @@
+import userEvent from "@testing-library/user-event";
 import type { ComponentType } from "react";
 import { Route } from "react-router";
 
-import { setupBookmarksEndpoints } from "__support__/server-mocks";
+import {
+  setupBookmarksEndpoints,
+  setupMetabotListModelsEndpoint,
+} from "__support__/server-mocks";
 import { mockSettings } from "__support__/settings";
-import { renderWithProviders, screen } from "__support__/ui";
+import { renderWithProviders, screen, waitFor } from "__support__/ui";
 import { useGetSuggestedMetabotPromptsQuery } from "metabase/api";
 import {
   useMetabotAgent,
@@ -29,31 +33,47 @@ jest.mock("metabase/metabot/hooks", () => ({
 const TestSubject = MetabotQueryBuilder as ComponentType;
 
 type SetupOptions = {
+  modelOverride?: string;
   showIllustrations?: boolean;
   prompt?: string;
   suggestedPrompts?: { prompt: string }[];
 };
 
 function setup({
+  modelOverride,
   showIllustrations = true,
   prompt = "",
   suggestedPrompts = [],
 }: SetupOptions = {}) {
+  const resetConversation = jest.fn();
+  const submitInput = jest.fn().mockResolvedValue({
+    type: "metabase/metabot/submitInput/fulfilled",
+    meta: { requestId: "test-request", requestStatus: "fulfilled" },
+    payload: {
+      success: true,
+      data: { processedResponse: { data: [{ type: "navigate_to" }] } },
+    },
+  });
+  const setModelOverride = jest.fn();
+
   jest.mocked(useUserMetabotPermissions).mockReturnValue({
     hasNlqAccess: true,
     canUseNlq: true,
   } as any);
 
   setupBookmarksEndpoints([]);
+  setupMetabotListModelsEndpoint();
 
   jest.mocked(useMetabotAgent).mockReturnValue({
     setVisible: jest.fn(),
-    resetConversation: jest.fn(),
-    submitInput: jest.fn(),
+    resetConversation,
+    submitInput,
     cancelRequest: jest.fn(),
     setPrompt: jest.fn(),
     metabotId: "default",
     isDoingScience: false,
+    modelOverride,
+    setModelOverride,
     prompt,
     promptInputRef: { current: null },
   } as any);
@@ -63,12 +83,16 @@ function setup({
 
   const settings = mockSettings({
     "metabot-show-illustrations": showIllustrations,
+    "llm-metabot-provider": "anthropic/claude-haiku-4-5",
+    "llm-metabot-conversation-model-selection-enabled": true,
   });
 
-  return renderWithProviders(<Route path="/" component={TestSubject} />, {
+  const view = renderWithProviders(<Route path="/" component={TestSubject} />, {
     withRouter: true,
     storeInitialState: createMockState({ settings }),
   });
+
+  return { ...view, resetConversation, setModelOverride, submitInput };
 }
 
 describe("MetabotQueryBuilder", () => {
@@ -107,5 +131,35 @@ describe("MetabotQueryBuilder", () => {
   it("enables the send button when the prompt is non-empty", () => {
     setup({ prompt: "anything" });
     expect(screen.getByTestId("metabot-send-message")).toBeEnabled();
+  });
+
+  it("renders the model selector and changes the model override", async () => {
+    const { setModelOverride } = setup();
+
+    const modelSelector = screen.getByTestId("metabot-model-selector");
+    await waitFor(() => expect(modelSelector).toBeEnabled());
+
+    await userEvent.click(modelSelector);
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Claude Opus 4\.1/ }),
+    );
+
+    expect(setModelOverride).toHaveBeenCalledWith("anthropic/claude-opus-4-1");
+  });
+
+  it("preserves the selected model override when submitting", async () => {
+    const { resetConversation, setModelOverride, submitInput } = setup({
+      modelOverride: "anthropic/claude-opus-4-1",
+      prompt: "Show me orders",
+    });
+
+    await userEvent.click(screen.getByTestId("metabot-send-message"));
+
+    expect(resetConversation).toHaveBeenCalled();
+    expect(setModelOverride).toHaveBeenCalledWith("anthropic/claude-opus-4-1");
+    expect(submitInput).toHaveBeenCalledWith("Show me orders", {
+      profile: "nlq",
+      preventOpenSidebar: true,
+    });
   });
 });
