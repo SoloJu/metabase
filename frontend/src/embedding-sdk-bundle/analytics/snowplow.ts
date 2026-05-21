@@ -21,7 +21,7 @@ export const initSdkTelemetryPoc = (metabaseInstanceUrl: string): void => {
     platform: "web",
     eventMethod: "post",
     // The whole trick: send to the instance proxy path, not the collector's tp2.
-    postPath: "/api/analytics/snowplow-proxy",
+    postPath: "/api/analytics-proxy",
     // The proxy is anonymous (public) and cross-origin. Don't send the session
     // cookie: credentialed CORS would require Access-Control-Allow-Credentials,
     // which Metabase's SDK CORS doesn't set. (browser-tracker >= 3.24 exposes

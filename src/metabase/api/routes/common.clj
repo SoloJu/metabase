@@ -109,22 +109,3 @@
 (def ^{:arglists '([handler])} +auth
   "Wrap `routes` so they may only be accessed with proper authentication credentials."
   (wrap-middleware-for-open-api-spec-generation enforce-authentication))
-
-(mu/defn- enforce-authentication-except-snowplow-proxy :- ifn?
-  "Like [[enforce-authentication]], but lets `POST /api/analytics/snowplow-proxy` through unauthenticated.
-
-  That endpoint is intentionally PUBLIC: it's an anonymous blind passthrough to the Snowplow collector, mirroring the
-  collector being publicly reachable today. The Embedding SDK's browser-tracker can't carry a Metabase session
-  cross-origin, so gating it on auth would make SDK telemetry impossible. See EMB-1764 (PoC) / EMB-1758. This is a
-  deliberate, security-reviewed exception to the `/analytics` namespace otherwise being `+auth`."
-  [handler :- ifn?]
-  (fn [{:keys [metabase-user-id uri] :as request} respond raise]
-    (if (or metabase-user-id
-            (str/ends-with? (str uri) "/analytics/snowplow-proxy"))
-      (handler request respond raise)
-      (respond api.response/response-unauthentic))))
-
-(def ^{:arglists '([handler])} +auth-except-snowplow-proxy
-  "Like [[+auth]], but leaves the public Snowplow telemetry proxy unauthenticated. See
-  [[enforce-authentication-except-snowplow-proxy]]."
-  (wrap-middleware-for-open-api-spec-generation enforce-authentication-except-snowplow-proxy))

@@ -187,6 +187,7 @@
    :api  #{metabase.analytics.api
            metabase.analytics.core
            metabase.analytics.init
+           metabase.analytics.proxy-api
            metabase.analytics.settings
            metabase.analytics.snowplow}
    :uses #{analytics-interface

@@ -1,12 +1,9 @@
 (ns metabase.analytics.api
   (:require
-   [clj-http.client :as http]
    [metabase.analytics.prometheus :as prometheus]
-   [metabase.analytics.settings :as analytics.settings]
    [metabase.analytics.stats :as stats]
    [metabase.api.macros :as api.macros]
    [metabase.permissions.core :as perms]
-   [metabase.util.json :as json]
    [metabase.util.log :as log]))
 
 ;; I don't think this endpoint is actually used anywhere for anything.
@@ -44,30 +41,3 @@
         :clear   (prometheus/clear! metric))
       (catch Exception e
         (log/warnf e "Failed to record internal analytics event %s %s" op metric)))))
-
-;; PoC (EMB-1764): blind passthrough Snowplow proxy. The Embedding SDK runs in the customer's page, where the
-;; customer's `connect-src` CSP blocks a direct browser POST to the Snowplow collector. The SDK instead POSTs the
-;; tracker's `tp2` payload here (same host as its data calls, already CSP-allowlisted) and we forward it to the
-;; collector server-side, where no browser CSP applies. Throwaway PoC quality — the production endpoint is EMB-1758
-;; (true raw byte passthrough, response-status relay, auth/abuse decisions).
-#_{:clj-kondo/ignore [:metabase/validate-defendpoint-has-response-schema]}
-(api.macros/defendpoint :post "/snowplow-proxy"
-  "Forward a Snowplow `tp2` payload to the configured collector server-side, so SDK telemetry dodges the customer
-  page's `connect-src` CSP."
-  [_route-params
-   _query-params
-   body]
-  (let [collector-url (str (analytics.settings/snowplow-url) "/com.snowplowanalytics.snowplow/tp2")]
-    (try
-      (let [response (http/post collector-url
-                                {:body             (json/encode body)
-                                 :content-type     :json
-                                 :throw-exceptions false})]
-        (log/infof "snowplow-proxy -> %s : %s" collector-url (:status response))
-        {:status (:status response)
-         :body   (:body response)})
-      (catch Exception e
-        ;; PoC: surface the cause instead of an opaque 500. Most likely the collector is unreachable.
-        (log/errorf e "snowplow-proxy failed forwarding to %s" collector-url)
-        {:status 502
-         :body   {:error (ex-message e)}}))))
