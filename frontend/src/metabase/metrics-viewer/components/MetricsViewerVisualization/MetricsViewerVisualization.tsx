@@ -5,6 +5,10 @@ import { noop } from "underscore";
 import { DebouncedFrame } from "metabase/common/components/DebouncedFrame";
 import { ErrorMessage } from "metabase/common/components/ErrorMessage";
 import { LoadingAndErrorWrapper } from "metabase/common/components/LoadingAndErrorWrapper";
+import {
+  DimensionPillBar,
+  type DimensionPillBarItem,
+} from "metabase/metrics-viewer/components/DimensionPillBar";
 import { DISPLAY_TYPE_REGISTRY } from "metabase/metrics-viewer/utils";
 import { MetricsViewerClickActionsMode } from "metabase/metrics-viewer/utils/MetricsViewerClickActionsMode";
 import { getGridColumns } from "metabase/metrics-viewer/utils/grid-columns";
@@ -38,6 +42,7 @@ type MetricsViewerVisualizationProps = {
   interactive?: boolean;
   queriesAreLoading: boolean;
   queriesError: string | null;
+  chartColumnLabelsByEntityIndex?: Map<number, DimensionPillBarItem>;
 };
 
 export function MetricsViewerVisualization({
@@ -53,6 +58,7 @@ export function MetricsViewerVisualization({
   interactive = true,
   queriesAreLoading,
   queriesError,
+  chartColumnLabelsByEntityIndex,
 }: MetricsViewerVisualizationProps) {
   const { ref, width } = useElementSize();
   const cols = getGridColumns(width, rawSeries.length);
@@ -144,6 +150,13 @@ export function MetricsViewerVisualization({
                   isMetricsViewer
                 />
               </DebouncedFrame>
+              <ChartColumnLabel
+                item={getChartColumnLabel(
+                  series.card.id,
+                  cardIdToEntityIndex,
+                  chartColumnLabelsByEntityIndex,
+                )}
+              />
             </Stack>
           ))}
         </SimpleGrid>
@@ -162,4 +175,25 @@ export function MetricsViewerVisualization({
       )}
     </Flex>
   );
+}
+
+function getChartColumnLabel(
+  cardId: CardId,
+  cardIdToEntityIndex: Record<CardId, number>,
+  chartColumnLabelsByEntityIndex?: Map<number, DimensionPillBarItem>,
+): DimensionPillBarItem | undefined {
+  const entityIndex = cardIdToEntityIndex[cardId];
+  if (entityIndex == null) {
+    return undefined;
+  }
+
+  return chartColumnLabelsByEntityIndex?.get(entityIndex);
+}
+
+function ChartColumnLabel({ item }: { item?: DimensionPillBarItem }) {
+  if (!item?.label) {
+    return null;
+  }
+
+  return <DimensionPillBar items={[item]} textSize="12px" />;
 }

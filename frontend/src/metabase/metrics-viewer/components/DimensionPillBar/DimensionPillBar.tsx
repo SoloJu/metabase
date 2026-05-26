@@ -53,9 +53,13 @@ export type DimensionPillBarItem =
 
 export interface DimensionPillBarProps {
   items: DimensionPillBarItem[];
+  textSize?: "12px" | "sm";
 }
 
-export function DimensionPillBar({ items }: DimensionPillBarProps) {
+export function DimensionPillBar({
+  items,
+  textSize = "sm",
+}: DimensionPillBarProps) {
   if (items.length === 0) {
     return null;
   }
@@ -76,6 +80,7 @@ export function DimensionPillBar({ items }: DimensionPillBarProps) {
           label={item.label}
           icon={item.icon}
           colors={item.colors}
+          textSize={textSize}
         />
       ))}
     </Flex>
@@ -86,10 +91,12 @@ function DimensionLabel({
   label,
   icon,
   colors,
+  textSize,
 }: {
   label?: string;
   icon?: IconName;
   colors?: string[];
+  textSize: "12px" | "sm";
 }) {
   if (!label) {
     return null;
@@ -102,7 +109,7 @@ function DimensionLabel({
         fallbackIcon={icon ?? "add"}
         size={12}
       />
-      <Text size="sm" lh="1rem" c="text-primary">
+      <Text size={textSize} lh="1rem" c="text-primary">
         {label}
       </Text>
     </Flex>
