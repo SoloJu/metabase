@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
+import { fireComponentEvent } from "embedding-sdk-bundle/analytics/snowplow";
 import { withPublicComponentWrapper } from "embedding-sdk-bundle/components/private/PublicComponentWrapper";
 import { SdkInternalNavigationProvider } from "embedding-sdk-bundle/components/private/SdkInternalNavigation/SdkInternalNavigationProvider";
 import { useSdkInternalNavigation } from "embedding-sdk-bundle/components/private/SdkInternalNavigation/context";
@@ -73,6 +74,12 @@ export const InteractiveDashboardContent = (
 };
 
 const InteractiveDashboardInner = (props: InteractiveDashboardProps) => {
+  // PoC (EMB-1764 round 3): fire one per-mount telemetry event. EMB-1786 will
+  // replace this with the real registry (first-mount-wins by id).
+  useEffect(() => {
+    fireComponentEvent("dashboard", String(props.dashboardId));
+  }, [props.dashboardId]);
+
   return (
     <SdkInternalNavigationProvider
       style={props.style}

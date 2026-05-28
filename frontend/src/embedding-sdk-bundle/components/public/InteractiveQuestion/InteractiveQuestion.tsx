@@ -1,6 +1,7 @@
 import type { FC } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
+import { fireComponentEvent } from "embedding-sdk-bundle/analytics/snowplow";
 import { withPublicComponentWrapper } from "embedding-sdk-bundle/components/private/PublicComponentWrapper";
 import { SdkInternalNavigationBackButton } from "embedding-sdk-bundle/components/private/SdkInternalNavigation/SdkInternalNavigationBackButton";
 import {
@@ -109,6 +110,18 @@ function InteractiveQuestionInner({
     () => (query ? deserializeCardFromQuery(query) : undefined),
     [query],
   );
+
+  // PoC (EMB-1764 round 3): fire one per-mount telemetry event. EMB-1786 will
+  // replace this with the real registry.
+  const questionId = (rest as { questionId?: string | number }).questionId;
+  useEffect(() => {
+    fireComponentEvent(
+      questionId === "new" || questionId === "new-native"
+        ? "exploration"
+        : "question",
+      String(questionId ?? "unknown"),
+    );
+  }, [questionId]);
 
   return <SdkQuestion {...rest} deserializedCard={deserializedCard} />;
 }

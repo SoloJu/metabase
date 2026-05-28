@@ -5,41 +5,115 @@ import {
 
 const SDK_TRACKER_NAME = "sdk";
 
+const SCHEMA = "iglu:com.metabase/embedded_analytics_js/jsonschema/3-0-0";
+
 /**
- * PoC (EMB-1764): point the Snowplow browser-tracker at the Metabase instance
- * instead of the collector, so SDK telemetry routes through the instance proxy
- * (`/api/analytics/snowplow-proxy`) and dodges the customer page's `connect-src`
- * CSP. `connect-src` matches scheme+host+port and ignores the path, so the
- * instance host the SDK already calls for data passes with no customer config.
+ * PoC (EMB-1764, round 3): Option B from the SDK analytics tech plan — per-mount
+ * component events + a separate `global` beacon at provider init. Both route
+ * through `/api/analytics-proxy` to dodge the customer page's `connect-src` CSP.
  *
- * Throwaway PoC quality — the production tracker is EMB-1760 (opt-out gate via
- * the instance's anonymous-tracking setting, iframe-matching event shape).
+ * Risk decisions captured in
+ * `.claude/kelvin/2026-05-21-emb-1764-.../06-poc-3-plan.md`. Schema reuse, wire
+ * shape, and cardinality questions are flagged as [DATA-TEAM] in that plan; PoC
+ * picks working defaults and surfaces shape issues via Snowplow Micro's
+ * `/micro/bad` bucket.
+ *
+ * Production tracker (with the real registry, first-mount-wins dedup, opt-out
+ * gate, and dimension extraction) is EMB-1786.
  */
-export const initSdkTelemetryPoc = (metabaseInstanceUrl: string): void => {
+
+// Per tab, per load. Module-scoped lazy so it survives StrictMode double-mount
+// and any nested MetabaseProvider without regeneration. Never persisted.
+let sessionId: string | undefined;
+const getSessionId = (): string => (sessionId ??= crypto.randomUUID());
+
+// Industry-standard guard: Snowplow tracker calls are fire-and-forget, so
+// React 18 StrictMode double-mount would duplicate. Module-scoped flag is the
+// pattern PostHog / Segment / Snowplow docs all recommend for once-per-session
+// init beacons.
+let hasFiredGlobal = false;
+
+let trackerInitialized = false;
+const ensureTracker = (metabaseInstanceUrl: string): void => {
+  if (trackerInitialized) {
+    return;
+  }
+  trackerInitialized = true;
   newTracker(SDK_TRACKER_NAME, metabaseInstanceUrl, {
     appId: "metabase",
     platform: "web",
     eventMethod: "post",
-    // The whole trick: send to the instance proxy path, not the collector's tp2.
     postPath: "/api/analytics-proxy",
-    // The proxy is anonymous (public) and cross-origin. Don't send the session
-    // cookie: credentialed CORS would require Access-Control-Allow-Credentials,
-    // which Metabase's SDK CORS doesn't set. (browser-tracker >= 3.24 exposes
-    // this; it was hardcoded true before.)
-    withCredentials: false,
+    // The proxy is anonymous (public) and cross-origin. v4 defaults to
+    // 'include'; force 'omit' so no session cookie is sent.
+    credentials: "omit",
+    // Per-mount immediate — no buffering, no keepalive. Each fire is its own
+    // POST. Production may revisit (doc Q7).
+    bufferSize: 1,
     stateStorageStrategy: "none",
     anonymousTracking: { withServerAnonymisation: true },
   });
+};
 
+export const fireGlobalBeacon = (metabaseInstanceUrl: string): void => {
+  ensureTracker(metabaseInstanceUrl);
+  if (hasFiredGlobal) {
+    return;
+  }
+  hasFiredGlobal = true;
   trackSelfDescribingEvent(
     {
       event: {
-        schema: "iglu:com.metabase/embedded_analytics_js/jsonschema/3-0-0",
+        schema: SCHEMA,
         data: {
           event: "setup",
-          // `source` is additive (3-0-0 allows additionalProperties); see EMB-1759.
-          global: { auth_method: "session", locale_used: false, source: "sdk" },
+          session_id: getSessionId(),
+          global: {
+            auth_method: "session",
+            locale_used: false,
+            source: "sdk",
+          },
           components: [],
+        },
+      },
+    },
+    [SDK_TRACKER_NAME],
+  );
+};
+
+export type SdkComponentBucket =
+  | "dashboard"
+  | "question"
+  | "exploration"
+  | "browser"
+  | "metabot";
+
+export const fireComponentEvent = (
+  component: SdkComponentBucket,
+  key: string,
+): void => {
+  // Assumes fireGlobalBeacon has already initialized the tracker. Components
+  // mount inside ComponentProvider, which fires the global beacon at init.
+  if (!trackerInitialized) {
+    return;
+  }
+  // Fit the iframe's `embedded_analytics_js 3-0-0` schema:
+  //   - `event` is enum-locked to "setup"
+  //   - `components[i].name` required, `properties` is an array of dimension
+  //     names (iframe ships e.g. ["withTitle","withDownloads"]); we drop `key`
+  //     in the wire payload — id-keyed identity is the [DATA-TEAM] question.
+  // The cardinality conflict (N rows/session on a schema iframe ships as 1
+  // row/session) is the [DATA-TEAM] flag in Risk 3.
+  void key;
+  trackSelfDescribingEvent(
+    {
+      event: {
+        schema: SCHEMA,
+        data: {
+          event: "setup",
+          session_id: getSessionId(),
+          global: {},
+          components: [{ name: component, properties: [] }],
         },
       },
     },

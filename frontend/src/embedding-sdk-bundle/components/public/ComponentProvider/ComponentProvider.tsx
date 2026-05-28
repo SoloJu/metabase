@@ -2,7 +2,7 @@
 import { Global } from "@emotion/react";
 import { type JSX, memo, useEffect, useId, useRef } from "react";
 
-import { initSdkTelemetryPoc } from "embedding-sdk-bundle/analytics/snowplow";
+import { fireGlobalBeacon } from "embedding-sdk-bundle/analytics/snowplow";
 import { ContentTranslationsProvider } from "embedding-sdk-bundle/components/private/ContentTranslationsProvider";
 import { SdkThemeProvider } from "embedding-sdk-bundle/components/private/SdkThemeProvider";
 import { useArePluginsReady } from "embedding-sdk-bundle/hooks/private/use-are-plugins-ready";
@@ -129,10 +129,10 @@ export const ComponentProviderInternal = (
     reduxStore.dispatch(setErrorComponent(errorComponent ?? null));
   }, [reduxStore, errorComponent]);
 
-  // PoC (EMB-1764): fire one telemetry event through the instance proxy to prove
-  // the SDK → proxy → collector chain works under a strict customer CSP.
+  // PoC (EMB-1764 round 3): fire the `global` beacon once at provider init.
+  // hasFired guard inside fireGlobalBeacon handles StrictMode double-mount.
   useEffect(() => {
-    initSdkTelemetryPoc(authConfig.metabaseInstanceUrl);
+    fireGlobalBeacon(authConfig.metabaseInstanceUrl);
   }, [authConfig.metabaseInstanceUrl]);
 
   const instanceLocale = useInstanceLocale();

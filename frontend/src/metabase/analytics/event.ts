@@ -59,10 +59,13 @@ export function trackSchemaEvent<S extends SchemaType>(
   }
 
   if (shouldSendEvent) {
-    Snowplow.trackSelfDescribingEvent({
+    // browser-tracker v4 narrowed `SelfDescribingJson.data` to a conditional
+    // type (`T extends {} ? T : never`); the generic `SchemaEventMap[S]` union
+    // can't satisfy it, so pin the payload type param and cast (EMB-1764 PoC-2).
+    Snowplow.trackSelfDescribingEvent<Record<string, unknown>>({
       event: {
         schema: `iglu:com.metabase/${schema}/jsonschema/${VERSIONS[schema]}`,
-        data: event,
+        data: event as Record<string, unknown>,
       },
     });
   }

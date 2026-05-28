@@ -1,6 +1,7 @@
 import { type ComponentType, useEffect } from "react";
 import { t } from "ttag";
 
+import { fireComponentEvent } from "embedding-sdk-bundle/analytics/snowplow";
 import {
   CollectionNotFoundError,
   SdkLoader,
@@ -106,6 +107,13 @@ export const CollectionBrowserInner = ({
   className,
   style,
 }: CollectionBrowserProps) => {
+  // PoC (EMB-1764 round 3): fire one per-mount telemetry event. Browser is a
+  // presence bucket — no id-keyed dedup. EMB-1786 will replace with the real
+  // registry.
+  useEffect(() => {
+    fireComponentEvent("browser", "browser");
+  }, []);
+
   const {
     baseCollectionId,
     internalCollectionId,

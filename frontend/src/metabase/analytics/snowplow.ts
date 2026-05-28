@@ -13,6 +13,10 @@ export const createSnowplowTracker = (getUserId: GetUserId): void => {
     appId: "metabase",
     platform: "web",
     eventMethod: "post",
+    // browser-tracker v4 defaults self-describing payloads to plain JSON; v3
+    // base64-encoded them. Pin v3 wire format so the bump doesn't alter what the
+    // collector/Micro receives for main-app + iframe analytics (EMB-1764 PoC-2).
+    encodeBase64: true,
     discoverRootDomain: true,
     contexts: { webPage: true },
     anonymousTracking: { withServerAnonymisation: true },
