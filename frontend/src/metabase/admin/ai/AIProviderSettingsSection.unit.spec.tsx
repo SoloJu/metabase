@@ -11,6 +11,8 @@ import {
 import { mockSettings } from "__support__/settings";
 import { act, renderWithProviders, screen, waitFor } from "__support__/ui";
 import { Api } from "metabase/api";
+import { AIProviderConfigurationForm } from "metabase/metabot/components/AIProviderConfigurationForm";
+import type { MetabotApiKeyProvider } from "metabase/metabot/components/AIProviderConfigurationForm/utils";
 import { reinitialize } from "metabase/plugins";
 import { defer } from "metabase/utils/promise";
 import type {
@@ -24,10 +26,10 @@ import {
   createMockSettings,
   createMockTokenFeatures,
   createMockTokenStatus,
+  createMockUser,
 } from "metabase-types/api/mocks";
 
-import { MetabotSetup, MetabotSetupInner } from "./MetabotSetup";
-import type { MetabotApiKeyProvider } from "./utils";
+import { AIProviderSettingsSection } from "./AIProviderSettingsSection";
 
 const DEFAULT_RESPONSES: Record<MetabotProvider, MetabotSettingsResponse> = {
   metabase: {
@@ -382,13 +384,19 @@ async function setup({
     return 204;
   });
 
-  const storeInitialState = { settings };
+  const storeInitialState = {
+    settings,
+    currentUser: createMockUser({ is_superuser: true }),
+  };
   const view = renderAsModal
-    ? renderWithProviders(<MetabotSetupInner isModal onClose={onClose} />, {
-        storeInitialState,
-      })
+    ? renderWithProviders(
+        <AIProviderConfigurationForm isModal onClose={onClose} />,
+        {
+          storeInitialState,
+        },
+      )
     : renderWithProviders(
-        <Route path="/admin/metabot*" component={MetabotSetup} />,
+        <Route path="/admin/metabot*" component={AIProviderSettingsSection} />,
         {
           withRouter: true,
           initialRoute: "/admin/metabot",
@@ -437,7 +445,7 @@ async function confirmDisconnectProvider() {
   );
 }
 
-describe("MetabotSetup", () => {
+describe("AIProviderSettingsSection", () => {
   afterEach(() => {
     reinitialize();
   });
