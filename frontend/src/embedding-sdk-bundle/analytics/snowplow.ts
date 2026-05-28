@@ -1,7 +1,24 @@
 import {
+  flushBuffer,
   newTracker,
   trackSelfDescribingEvent,
 } from "@snowplow/browser-tracker";
+
+declare global {
+  interface Window {
+    // Investigation switch for the PoC-2 keepalive-on-unload mechanic. Default
+    // path is "immediate" (PoC-3 per-mount-fire). Setting this to "batched"
+    // before MetabaseProvider mounts flips the SDK to buffer events + flush on
+    // visibilitychange/pagehide via fetch keepalive. Removed once production
+    // sub-strategy (doc Q7) is locked.
+    __pocTelemetryMode?: "immediate" | "batched";
+  }
+}
+
+const getPocTelemetryMode = (): "immediate" | "batched" =>
+  typeof window !== "undefined" && window.__pocTelemetryMode === "batched"
+    ? "batched"
+    : "immediate";
 
 const SDK_TRACKER_NAME = "sdk";
 
@@ -39,6 +56,7 @@ const ensureTracker = (metabaseInstanceUrl: string): void => {
     return;
   }
   trackerInitialized = true;
+  const mode = getPocTelemetryMode();
   newTracker(SDK_TRACKER_NAME, metabaseInstanceUrl, {
     appId: "metabase",
     platform: "web",
@@ -47,12 +65,26 @@ const ensureTracker = (metabaseInstanceUrl: string): void => {
     // The proxy is anonymous (public) and cross-origin. v4 defaults to
     // 'include'; force 'omit' so no session cookie is sent.
     credentials: "omit",
-    // Per-mount immediate — no buffering, no keepalive. Each fire is its own
-    // POST. Production may revisit (doc Q7).
-    bufferSize: 1,
+    // Immediate: 1 event = 1 POST. Batched: buffer up to 16, fire+forget at
+    // visibilitychange:hidden via fetch keepalive (PoC-2 path under
+    // investigation).
+    bufferSize: mode === "batched" ? 16 : 1,
+    keepalive: mode === "batched",
     stateStorageStrategy: "none",
     anonymousTracking: { withServerAnonymisation: true },
   });
+
+  if (mode === "batched") {
+    const flush = (): void => {
+      flushBuffer([SDK_TRACKER_NAME]);
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    });
+    window.addEventListener("pagehide", flush);
+  }
 };
 
 export const fireGlobalBeacon = (metabaseInstanceUrl: string): void => {
