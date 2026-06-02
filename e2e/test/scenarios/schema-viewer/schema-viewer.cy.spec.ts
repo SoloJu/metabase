@@ -62,6 +62,59 @@ const SV_SETUP_SQL = `
   );
 `;
 
+const SV_REQUIRED_TABLES = [
+  "users",
+  "profiles",
+  "categories",
+  "products",
+  "lookup",
+  "other",
+];
+
+// `H.resyncDatabase` POSTs sync_schema once and then only *polls* for tables.
+// But sync_schema submits to a single-threaded task pool (a slow predecessor
+// task blocks the queue) and is subject to duplicate-op suppression (a sync
+// already in flight makes ours a silent no-op). Either race leaves the new
+// schemas undiscovered, so a single POST + poll intermittently times out with
+// zero tables. Re-trigger the sync each round until every table we need has
+// finished syncing (which also guarantees fields + FKs are in place).
+function resyncWritableSchemasUntilReady(iteration = 0) {
+  const POLL_DELAY_MS = 500;
+  const MAX_ITERATIONS = 40;
+  // Re-POST sync_schema (which runs a synchronous connect check) far less often
+  // than we poll the cheap metadata GET — every Nth iteration.
+  const RESYNC_EVERY = 8;
+
+  if (iteration === MAX_ITERATIONS) {
+    throw new Error(
+      `Writable DB sync never surfaced all sv_test/sv_extra tables: ${SV_REQUIRED_TABLES.join(
+        ", ",
+      )}`,
+    );
+  }
+
+  // Re-trigger on the first iteration and periodically thereafter, so a sync
+  // that was queued behind a slow task or coalesced away gets kicked again.
+  if (iteration % RESYNC_EVERY === 0) {
+    cy.request("POST", `/api/database/${WRITABLE_DB_ID}/sync_schema`);
+  }
+
+  cy.request<{
+    tables?: { name: string; initial_sync_status: string }[];
+  }>("GET", `/api/database/${WRITABLE_DB_ID}/metadata`).then(({ body }) => {
+    const synced = new Set(
+      (body.tables ?? [])
+        .filter((t) => t.initial_sync_status === "complete")
+        .map((t) => t.name),
+    );
+    if (SV_REQUIRED_TABLES.every((name) => synced.has(name))) {
+      return;
+    }
+    cy.wait(POLL_DELAY_MS);
+    resyncWritableSchemasUntilReady(iteration + 1);
+  });
+}
+
 const tableNode = (tableId: TableId) => cy.get(`[data-id="table-${tableId}"]`);
 const schemaPickerTrigger = () => cy.findByTestId("schema-picker-button");
 const searchInput = () => cy.findByTestId("schema-viewer-node-search-input");
@@ -328,7 +381,7 @@ describe("scenarios > schema-viewer (writable Postgres: multi-schema, self-ref, 
     H.activateToken("bleeding-edge");
     cy.intercept("GET", "/api/ee/erd*").as(ERD_ALIAS);
     H.queryWritableDB(SV_SETUP_SQL, "postgres");
-    H.resyncDatabase({ dbId: WRITABLE_DB_ID });
+    resyncWritableSchemasUntilReady();
   });
 
   after(() => {
