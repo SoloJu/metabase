@@ -99,6 +99,7 @@ const elements = [
   createElement({ type: "shared", name: "models" }),
   createElement({ type: "shared", name: "new" }),
   createElement({ type: "shared", name: "palette" }),
+  createElement({ type: "shared", name: "plugins" }),
   createElement({ type: "shared", name: "pulse" }),
   createElement({ type: "shared", name: "querying", enforceOutgoing: false }),
   createElement({ type: "shared", name: "questions" }),
