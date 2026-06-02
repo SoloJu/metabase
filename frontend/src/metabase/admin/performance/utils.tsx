@@ -5,6 +5,12 @@ import type { SchemaObjectDescription } from "yup/lib/schema";
 import { cronToScheduleSettings } from "metabase/common/components/Schedule/cron";
 import { getScheduleStrings } from "metabase/common/components/Schedule/strings";
 import { PLUGIN_CACHING } from "metabase/plugins";
+import {
+  type PerformanceTabId,
+  type StrategyData,
+  type StrategyLabel,
+  defaultMinDurationMs,
+} from "metabase/plugins";
 import { isNullOrUndefined } from "metabase/utils/types";
 import type {
   AdaptiveStrategy,
@@ -14,8 +20,7 @@ import type {
   CacheableModel,
 } from "metabase-types/api";
 
-import { defaultMinDurationMs, rootId } from "./constants/simple";
-import type { PerformanceTabId, StrategyData, StrategyLabel } from "./types";
+import { rootId } from "./constants/simple";
 
 type ErrorWithMessage = { data: { message: string } };
 export const isErrorWithMessage = (error: unknown): error is ErrorWithMessage =>
