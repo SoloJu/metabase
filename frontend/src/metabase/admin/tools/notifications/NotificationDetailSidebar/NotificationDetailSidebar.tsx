@@ -103,7 +103,6 @@ export const NotificationDetailSidebar = ({
         <CreateOrEditQuestionAlertModal
           editingNotification={notification}
           question={question}
-          skipUrlUpdate
           onAlertUpdated={() => setIsEditModalOpen(false)}
           onClose={() => setIsEditModalOpen(false)}
         />
