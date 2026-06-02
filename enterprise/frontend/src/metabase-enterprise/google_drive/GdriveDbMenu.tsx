@@ -117,7 +117,7 @@ function SyncNowButton({ disabled }: { disabled: boolean }) {
         await doSync();
       }}
     >
-      {t`Sync now`}
+      {t`Sync`}
     </Menu.Item>
   );
 }
@@ -161,6 +161,23 @@ function MenuSyncStatus() {
     : t`soon` + "™";
 
   if (folderStatus === "error") {
+    // A connection that synced before but is erroring now is most likely
+    // recovering from a transient failure (it auto-retries), so reassure
+    // instead of showing the alarming "Couldn't sync" message that scares
+    // admins into disconnecting (CLO-5546). A connection that never synced
+    // (no last_sync_at) or that we can't even reach (folderError) is a real
+    // error — keep the actionable message.
+    if (!folderError && lastSync) {
+      const isDelayed = dayjs
+        .unix(lastSync)
+        .isBefore(dayjs().subtract(1, "hour"));
+      return (
+        <GdriveRecoveringMenuItem
+          lastSyncRelative={lastSyncRelative ?? ""}
+          isDelayed={isDelayed}
+        />
+      );
+    }
     return <GdriveErrorMenuItem error={folderError ?? folderInfo} />;
   }
 
@@ -184,3 +201,27 @@ const SyncingText = () => (
     <Loader size="xs" />
   </Flex>
 );
+
+function GdriveRecoveringMenuItem({
+  lastSyncRelative,
+  isDelayed,
+}: {
+  lastSyncRelative: string;
+  isDelayed: boolean;
+}) {
+  if (isDelayed) {
+    return (
+      <>
+        <Text fw="bold">{t`Sync delayed`}</Text>
+        <Text fz="sm">{t`Last synced ${lastSyncRelative}. Your data may be a bit behind. We're retrying the sync.`}</Text>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Text fw="bold">{t`Retrying shortly`}</Text>
+      <Text fz="sm">{t`Last synced ${lastSyncRelative}. Your data is up to date as of the last sync.`}</Text>
+    </>
+  );
+}
