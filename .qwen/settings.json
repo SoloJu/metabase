@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "name": "append-to-collab",
+            "type": "command",
+            "command": "python3 $QWEN_PROJECT_DIR/.agentsync/hooks/qwen_append_to_collab.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "append-to-collab": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 scripts/antigravity_append_to_collab.py"
+      }
+    ]
+  }
+}

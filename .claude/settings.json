@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.agentsync/hooks/claude_append_to_collab.py\" claude"
+          }
+        ]
+      }
+    ]
+  }
+}
